@@ -76,47 +76,38 @@ class ReadPcf8574(Resource):
             return {'error': 'IO not found.'}
 
 
-class VirtualInput(object):
-
-    def __init__(self, output):
-        self.__last_states = 0x00
-        self.__output = output
-
-    @property
-    def last_states(self):
-        return self.__last_states
-
-    @last_states.setter
-    def last_states(self, last_states):
-        self.__last_states = last_states
-
-    @property
-    def output(self):
-        return self.__output
-
-
 class WriteByteVirtual(Resource):
 
     outputs = {
-        0x00: VirtualInput(
-            i2c_io[0x01][0x20]
-        )
+        0x00: i2c_io[0x01][0x20]
     }
 
     def get(self, address, value):
         address = int(address, 16)
         if address not in WriteByteVirtual.outputs:
             return {'error': 'Virtual IO not found.'}
-        vInput = WriteByteVirtual.outputs[address]
+        vOutput = WriteByteVirtual.outputs[address]
         value = int(value, 16)
 
-        changing_states = (value & (~vInput.last_states & 0xff))
+        vOutput.value = value
 
-        if changing_states != 0x00:
-            vInput.output.flipBits(changing_states)
-        vInput.last_states = value
+        return {'output': vOutput.value}
 
-        return {'output': vInput.output.value}
+
+class ReadByteVirtual(Resource):
+
+    inputs = {
+        0x00: i2c_io[0x01][0x20]
+    }
+
+    def get(self, address):
+        address = int(address, 16)
+        if address not in ReadByteVirtual.inputs:
+            return {'error': 'Virtual IO not found.'}
+        vInput = ReadByteVirtual.inputs[address]
+
+        return {'input': vInput.value}
+
 
 api.add_resource(WritePcf8574,
                  '/physical/0x<string:bus_id>/0x<string:address>/0x<string:value>')
@@ -124,6 +115,8 @@ api.add_resource(ReadPcf8574,
                  '/physical/0x<string:bus_id>/0x<string:address>')
 api.add_resource(WriteByteVirtual,
                  '/virtual/0x<string:address>/0x<string:value>')
+api.add_resource(ReadByteVirtual,
+                 '/virtual/0x<string:address>')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
